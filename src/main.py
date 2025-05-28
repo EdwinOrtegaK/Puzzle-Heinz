@@ -33,6 +33,38 @@ def cargar_datos():
 
     return nodos, grafo, relacion_info
 
+# Resolver rompecabezas
+def resolver_rompecabezas(nodos, grafo, relacion_info):
+    ROWS, COLS = 4, 6
+    total_piezas = ROWS * COLS
+    grilla = [[None for _ in range(COLS)] for _ in range(ROWS)]
+    usadas = set()
+    offsets = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+
+    def es_valida(pieza, fila, col):
+        for dr, dc in offsets:
+            r, c = fila + dr, col + dc
+            if 0 <= r < ROWS and 0 <= c < COLS and grilla[r][c] is not None:
+                vecino = grilla[r][c]
+                if not (pieza in grafo and vecino in grafo[pieza]) and not (vecino in grafo and pieza in grafo[vecino]):
+                    return False
+        return True
+
+    def backtrack(pos=0):
+        if pos == total_piezas:
+            return True
+        fila, col = divmod(pos, COLS)
+        for pieza in nodos - usadas:
+            if es_valida(pieza, fila, col):
+                grilla[fila][col] = pieza
+                usadas.add(pieza)
+                if backtrack(pos + 1):
+                    return True
+                grilla[fila][col] = None
+                usadas.remove(pieza)
+        return False
+
+    return grilla if backtrack() else None
 
 # Ejecutar todo
 nodos, grafo, relaciones = cargar_datos()
