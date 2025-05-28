@@ -66,5 +66,32 @@ def resolver_rompecabezas(nodos, grafo, relacion_info):
 
     return grilla if backtrack() else None
 
+# Obtener pasos desde una pieza
+def obtener_pasos_desde(origen_inicial, grafo, relacion_info):
+    pasos = []
+    visitados = set()
+
+    def dfs(actual):
+        visitados.add(actual)
+        for vecino in grafo[actual]:
+            if vecino not in visitados:
+                origen_con, destino_con = relacion_info[(actual, vecino)]
+                pasos.append(f"Pieza {actual} ({origen_con}) → Pieza {vecino} ({destino_con})")
+                dfs(vecino)
+
+    dfs(origen_inicial)
+    return pasos
+
 # Ejecutar todo
 nodos, grafo, relaciones = cargar_datos()
+solucion = resolver_rompecabezas(nodos, grafo, relaciones)
+
+if solucion:
+    print("Rompecabezas resuelto:")
+    for fila in solucion:
+        print(fila)
+    print("\nPasos desde pieza 1:")
+    for paso in obtener_pasos_desde(1, grafo, relaciones):
+        print(paso)
+else:
+    print("No se encontró solución")
