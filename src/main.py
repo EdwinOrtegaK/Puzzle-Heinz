@@ -15,91 +15,112 @@ def cargar_datos():
     relacion_info = {}
 
     with driver.session() as session:
-        # Obtener nodos
-        result_nodos = session.run("MATCH (p:Pieza) RETURN p.id AS id")
-        for row in result_nodos:
+        # Nodos
+        for row in session.run("MATCH (p:Pieza) RETURN p.id AS id"):
             nodos.add(row["id"])
 
-        # Obtener relaciones macho -> hembra
-        result_relaciones = session.run("""
+        # Relaciones macho<->hembra
+        for row in session.run("""
             MATCH (a:Pieza)-[r:CONECTA]->(b:Pieza)
-            WHERE r.pieza_origen STARTS WITH 'macho' AND r.pieza_destino STARTS WITH 'hembra'
-            RETURN a.id AS from, b.id AS to, r.pieza_origen AS pieza_origen, r.pieza_destino AS pieza_destino
-        """)
-        for row in result_relaciones:
-            f, t = row["from"], row["to"]
+            WHERE 
+              (r.pieza_origen STARTS WITH 'macho' AND r.pieza_destino STARTS WITH 'hembra')
+              OR
+              (r.pieza_origen STARTS WITH 'hembra' AND r.pieza_destino STARTS WITH 'macho')
+            RETURN a.id AS f, b.id AS t, r.pieza_origen AS po, r.pieza_destino AS pd
+        """):
+            f = row["f"]; t = row["t"]
+            po, pd = row["po"], row["pd"]
+
+            # Arista en ambos sentidos
             grafo[f].append(t)
-            relacion_info[(f, t)] = (row["pieza_origen"], row["pieza_destino"])
+            grafo[t].append(f)
+
+            # Etiquetas para imprimir
+            relacion_info[(f, t)] = (po, pd)
+            # para el inverso, intercambiamos roles
+            relacion_info[(t, f)] = (pd, po)
 
     return nodos, grafo, relacion_info
 
-# Resolver rompecabezas
+
+# Resolver rompecabezas irregular como árbol sin superar 4 conexiones por pieza
 def resolver_rompecabezas(nodos, grafo, relacion_info):
-    ROWS, COLS = 4, 6
-    total_piezas = ROWS * COLS
-    grilla = [[None for _ in range(COLS)] for _ in range(ROWS)]
+    total = len(nodos)
+    grados = defaultdict(int)
     usadas = set()
-    offsets = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+    conexiones = []
 
-    def es_valida(pieza, fila, col):
-        for dr, dc in offsets:
-            r, c = fila + dr, col + dc
-            if 0 <= r < ROWS and 0 <= c < COLS and grilla[r][c] is not None:
-                vecino = grilla[r][c]
-                if not (pieza in grafo and vecino in grafo[pieza]) and not (vecino in grafo and pieza in grafo[vecino]):
-                    return False
-        return True
-
-    def backtrack(pos=0):
-        if pos == total_piezas:
+    def backtrack():
+        # todos conectados → éxito
+        if len(usadas) == total:
             return True
-        fila, col = divmod(pos, COLS)
-        for pieza in nodos - usadas:
-            if es_valida(pieza, fila, col):
-                grilla[fila][col] = pieza
-                usadas.add(pieza)
-                if backtrack(pos + 1):
-                    return True
-                grilla[fila][col] = None
-                usadas.remove(pieza)
+
+        # iterar sobre TODAS las piezas ya usadas
+        for u in list(usadas):
+            # tratar todas las aristas u → v
+            for v in grafo[u]:
+                if v not in usadas and grados[u] < 4 and grados[v] < 4:
+                    # añadimos la arista al árbol
+                    usadas.add(v)
+                    grados[u] += 1
+                    grados[v] += 1
+                    conexiones.append((u, v))
+
+                    if backtrack():
+                        return True
+
+                    # deshacer (backtrack)
+                    conexiones.pop()
+                    usadas.remove(v)
+                    grados[u] -= 1
+                    grados[v] -= 1
+
         return False
 
-    return grilla if backtrack() else None
+    # probar cada nodo como semilla
+    for seed in nodos:
+        usadas = {seed}
+        grados = defaultdict(int)
+        conexiones = []
+        if backtrack():
+            return conexiones
 
-# Obtener pasos desde una pieza
-def obtener_pasos_desde(origen_inicial, grafo, relacion_info):
+    return None
+
+
+# Obtener pasos (DFS) desde una pieza específica
+def obtener_pasos_desde(origen, grafo, relacion_info):
     pasos = []
     visitados = set()
 
-    def dfs(actual):
-        visitados.add(actual)
-        for vecino in grafo[actual]:
-            if vecino not in visitados:
-                origen_con, destino_con = relacion_info[(actual, vecino)]
-                pasos.append(f"Pieza {actual} ({origen_con}) → Pieza {vecino} ({destino_con})")
-                dfs(vecino)
+    def dfs(u):
+        visitados.add(u)
+        for v in grafo[u]:
+            if v not in visitados:
+                po, pd = relacion_info.get((u, v), ("?", "?"))
+                pasos.append(f"Pieza {u} ({po}) → Pieza {v} ({pd})")
+                dfs(v)
 
-    dfs(origen_inicial)
+    dfs(origen)
     return pasos
 
-# Ejecutar todo
-nodos, grafo, relaciones = cargar_datos()
-solucion = resolver_rompecabezas(nodos, grafo, relaciones)
+if __name__ == "__main__":
+    nodos, grafo, relaciones = cargar_datos()
+    solucion = resolver_rompecabezas(nodos, grafo, relaciones)
 
-if solucion:
-    print("Rompecabezas resuelto:")
-    for fila in solucion:
-        print(fila)
+    if solucion:
+        print("Resolucion de rompecabeza")
 
-    try:
-        origen_usuario = int(input("\nIngrese el ID de la pieza desde la cual desea iniciar: "))
-        if origen_usuario in grafo:
-            print(f"\nPasos desde pieza {origen_usuario}:")
-            for paso in obtener_pasos_desde(origen_usuario, grafo, relaciones):
-                print(paso)
-        else:
-            print("La pieza ingresada no tiene conexiones o no existe.")
-    except ValueError:
-        print("Entrada no válida. Debe ingresar un número de ID de pieza.")
-else:
-    print("No se encontró solución")
+        # Ahora permitimos al usuario ver el subárbol desde una pieza
+        try:
+            origen_usuario = int(input("\nID de la pieza para ver sus conexiones de árbol: "))
+            if origen_usuario in nodos:
+                print(f"\nPasos desde pieza {origen_usuario}:")
+                for paso in obtener_pasos_desde(origen_usuario, grafo, relaciones):
+                    print(f"  {paso}")
+            else:
+                print("La pieza ingresada no existe en el grafo.")
+        except ValueError:
+            print("Entrada no válida. Debe ingresar un número entero.")
+    else:
+        print("No se encontró solución")
