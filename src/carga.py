@@ -18,7 +18,7 @@ def subir_piezas():
                 """, id=row["id:ID"], label=row["label"])
 
 def subir_conexiones():
-    with open("data/conexiones_macho_a_hembra.csv", newline='') as file:
+    with open("data/conexiones.csv", newline='') as file:
         reader = csv.DictReader(file)
         with driver.session() as session:
             for row in reader:
