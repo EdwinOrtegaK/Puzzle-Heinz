@@ -14,8 +14,13 @@ def subir_piezas():
             for row in reader:
                 session.run("""
                     MERGE (p:Pieza {id: toInteger($id)})
-                    SET p.label = $label
-                """, id=row["id:ID"], label=row["label"])
+                    SET p.label = $label,
+                            p.faltante = $faltante
+                """, 
+                id=row["id:ID"], 
+                label=row["label"],
+                faltante=row.get("faltante", "false").lower() == "true"
+                )
 
 def subir_conexiones():
     with open("data/conexiones.csv", newline='') as file:
