@@ -89,38 +89,60 @@ def resolver_rompecabezas(nodos, grafo, relacion_info):
 
 
 # Obtener pasos (DFS) desde una pieza específica
-def obtener_pasos_desde(origen, grafo, relacion_info):
+def obtener_pasos_desde(origen_inicial, grafo, relacion_info, piezas_faltantes):
     pasos = []
     visitados = set()
 
-    def dfs(u):
-        visitados.add(u)
-        for v in grafo[u]:
-            if v not in visitados:
-                po, pd = relacion_info.get((u, v), ("?", "?"))
-                pasos.append(f"Pieza {u} ({po}) → Pieza {v} ({pd})")
-                dfs(v)
+    def dfs(actual):
+        visitados.add(actual)
+        for vecino in grafo[actual]:
+            if vecino not in visitados:
+                origen_con, destino_con = relacion_info[(actual, vecino)]
+                
+                origen_str = f"Pieza {actual} ({origen_con})"
+                destino_str = f"Pieza {vecino} ({destino_con})"
 
-    dfs(origen)
+                if actual in piezas_faltantes:
+                    origen_str += " FALTANTE"
+                if vecino in piezas_faltantes:
+                    destino_str += " FALTANTE"
+
+                pasos.append(f"{origen_str} → {destino_str}")
+                dfs(vecino)
+
+    dfs(origen_inicial)
     return pasos
 
+def mostrar_encabezado():
+    print(r"""
+               H  E  I  N  Z
+        Armado de Rompecabezas con Neo4j
+    """)
+    print("=" * 60)
+
 if __name__ == "__main__":
+    mostrar_encabezado()
+
     nodos, grafo, relaciones = cargar_datos()
     solucion = resolver_rompecabezas(nodos, grafo, relaciones)
 
     if solucion:
-        print("Resolucion de rompecabeza")
-
-        # Ahora permitimos al usuario ver el subárbol desde una pieza
         try:
-            origen_usuario = int(input("\nID de la pieza para ver sus conexiones de árbol: "))
-            if origen_usuario in nodos:
+            origen_usuario = int(input("\nIngrese el ID de la pieza desde la cual desea iniciar: "))
+
+            faltantes_input = input("¿Falta alguna pieza? Ingrese los ID separados por coma (o deje vacío si no): ").strip()
+            piezas_faltantes = set()
+            if faltantes_input.strip():
+                piezas_faltantes = {int(x) for x in faltantes_input.split(",") if x.strip().isdigit()}
+
+            if origen_usuario in grafo:
                 print(f"\nPasos desde pieza {origen_usuario}:")
-                for paso in obtener_pasos_desde(origen_usuario, grafo, relaciones):
-                    print(f"  {paso}")
+
+                for paso in obtener_pasos_desde(origen_usuario, grafo, relaciones, piezas_faltantes):
+                    print(paso)
             else:
-                print("La pieza ingresada no existe en el grafo.")
+                print("La pieza ingresada no tiene conexiones o no existe.")
         except ValueError:
-            print("Entrada no válida. Debe ingresar un número entero.")
+            print("Entrada no válida. Debe ingresar un número de ID de pieza.")
     else:
         print("No se encontró solución")
