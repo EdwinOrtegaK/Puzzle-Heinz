@@ -90,8 +90,16 @@ if solucion:
     print("Rompecabezas resuelto:")
     for fila in solucion:
         print(fila)
-    print("\nPasos desde pieza 1:")
-    for paso in obtener_pasos_desde(1, grafo, relaciones):
-        print(paso)
+
+    try:
+        origen_usuario = int(input("\nIngrese el ID de la pieza desde la cual desea iniciar: "))
+        if origen_usuario in grafo:
+            print(f"\nPasos desde pieza {origen_usuario}:")
+            for paso in obtener_pasos_desde(origen_usuario, grafo, relaciones):
+                print(paso)
+        else:
+            print("La pieza ingresada no tiene conexiones o no existe.")
+    except ValueError:
+        print("Entrada no válida. Debe ingresar un número de ID de pieza.")
 else:
     print("No se encontró solución")
